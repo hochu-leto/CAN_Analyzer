@@ -17,6 +17,34 @@ class ExampleApp(QtWidgets.QMainWindow, CANAnalyzer_ui.Ui_MainWindow):
         super().__init__()
         self.setupUi(self)  # Это нужно для инициализации нашего дизайна
 
+    def list_of_params(self, item):
+        self.params_table.setRowCount(0)
+        self.params_table.setRowCount(len(bookmark_dict[item.text()]))
+        row = 0
+        for par in bookmark_dict[item.text()]:
+            self.params_table.setItem(row, 0, QTableWidgetItem(par['name']))
+            value = self.get_param(int(par['address']))
+            print(wr_err)
+            self.params_table.setItem(row, 1, QTableWidgetItem(value))
+            if str(par['unit']) != 'nan':
+                self.params_table.setItem(row, 2, QTableWidgetItem(str(par['unit'])))
+            row += 1
+
+    def get_param(self, address):
+        global wr_err
+        address = int(address)
+        LSB = address & 0xFF
+        MSB = ((address & 0xFF00) >> 8)
+        print(hex(LSB) + " " + hex(MSB))
+        if not marathon.can_write(0x4F5, [0, 0, 0, 0, LSB, MSB, 0x2B, 0x03]):
+            wr_err = "can't send request"
+            return
+        data = marathon.can_read(0x4F7)
+        if data:
+            return (data[1] << 8) + data[0]
+        else:
+            wr_err = "can't read answer"
+
 
 app = QtWidgets.QApplication([])
 window = ExampleApp()  # Создаём объект класса ExampleApp
@@ -40,46 +68,15 @@ for param in params_list:
             window.list_bookmark.addItem(prev_name)
         prev_name = param['name']
 
-
-def list_of_params(item):
-    window.params_table.setRowCount(0)
-    window.params_table.setRowCount(len(bookmark_dict[item.text()]))
-    row = 0
-    for par in bookmark_dict[item.text()]:
-        window.params_table.setItem(row, 0, QTableWidgetItem(par['name']))
-        value = get_param(par['address'])
-        print(wr_err)
-        window.params_table.setItem(row, 1, QTableWidgetItem(value))
-        if str(par['unit']) != 'nan':
-            window.params_table.setItem(row, 2, QTableWidgetItem(str(par['unit'])))
-        row += 1
-
-
 marathon = CANMarathon()
 
-window.list_bookmark.itemClicked.connect(list_of_params)
+window.list_bookmark.itemClicked.connect(window.list_of_params)
 # marathon.can_write(0x4F5, [0x00, 0x00, 0x00, 0x00, 0x6D, 0x00, 0x2B, 0x03])  # запрос у передней рулевой рейки порядок
 # # передачи байт многобайтных параметров, 0x00 - прямой, 0x01 - обратный
 # marathon.can_read(0x4F7)
 
 window.show()  # Показываем окно
 app.exec_()  # и запускаем приложение
-
-
-def get_param(address):
-    global wr_err
-    address = int(address)
-    LSB = address & 0xFF
-    MSB = ((address & 0xFF00) >> 8)
-    print(hex(LSB) + " " + hex(MSB))
-    if not marathon.can_write(0x4F5, [0, 0, 0, 0, LSB, MSB, 0x2B, 0x03]):
-        wr_err = "can't write"
-        return
-    data = marathon.can_read(0x4F7)
-    if data:
-        return (data[1] << 8) + data[0]
-    else:
-        wr_err = "can't read"
 
 
 def set_param(address: int, value: int):
@@ -98,14 +95,14 @@ def set_param(address: int, value: int):
                 break
         return True
     else:
-        wr_err = "can't write"
+        wr_err = "can't write param into device"
         return False
 
 
 def get_all_params():
     for param in params_list:
         if param['address'] != 'nan':
-            param['value'] = get_param(address=int(param['address']))
+            param['value'] = window.get_param(address=int(param['address']))
     if not wr_err:
         return True
     return False
