@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'CANAnal.bk.ui'
+# Form implementation generated from reading ui file 'CANAnalyzer.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.4
 #
@@ -14,26 +14,29 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
-        MainWindow.resize(557, 549)
+        MainWindow.resize(798, 535)
         self.centralwidget = QtWidgets.QWidget(MainWindow)
         self.centralwidget.setObjectName("centralwidget")
         self.tabWidget = QtWidgets.QTabWidget(self.centralwidget)
-        self.tabWidget.setGeometry(QtCore.QRect(0, 0, 551, 511))
+        self.tabWidget.setGeometry(QtCore.QRect(0, 0, 841, 511))
         self.tabWidget.setObjectName("tabWidget")
         self.tab = QtWidgets.QWidget()
         self.tab.setObjectName("tab")
-        self.bookmark_list = QtWidgets.QListView(self.tab)
-        self.bookmark_list.setGeometry(QtCore.QRect(0, 0, 151, 481))
-        self.bookmark_list.setObjectName("bookmark_list")
         self.params_table = QtWidgets.QTableWidget(self.tab)
-        self.params_table.setGeometry(QtCore.QRect(160, 0, 371, 481))
+        self.params_table.setGeometry(QtCore.QRect(300, 0, 491, 481))
         self.params_table.setObjectName("params_table")
-        self.params_table.setColumnCount(2)
+        self.params_table.setColumnCount(3)
         self.params_table.setRowCount(0)
         item = QtWidgets.QTableWidgetItem()
+        item.setText("Name")
         self.params_table.setHorizontalHeaderItem(0, item)
         item = QtWidgets.QTableWidgetItem()
         self.params_table.setHorizontalHeaderItem(1, item)
+        item = QtWidgets.QTableWidgetItem()
+        self.params_table.setHorizontalHeaderItem(2, item)
+        self.list_bookmark = QtWidgets.QListWidget(self.tab)
+        self.list_bookmark.setGeometry(QtCore.QRect(0, 0, 291, 481))
+        self.list_bookmark.setObjectName("list_bookmark")
         self.tabWidget.addTab(self.tab, "")
         self.tab_2 = QtWidgets.QWidget()
         self.tab_2.setObjectName("tab_2")
@@ -43,7 +46,7 @@ class Ui_MainWindow(object):
         self.statusbar.setObjectName("statusbar")
         MainWindow.setStatusBar(self.statusbar)
         self.menubar = QtWidgets.QMenuBar(MainWindow)
-        self.menubar.setGeometry(QtCore.QRect(0, 0, 557, 21))
+        self.menubar.setGeometry(QtCore.QRect(0, 0, 798, 18))
         self.menubar.setObjectName("menubar")
         MainWindow.setMenuBar(self.menubar)
 
@@ -54,9 +57,9 @@ class Ui_MainWindow(object):
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
         MainWindow.setWindowTitle(_translate("MainWindow", "MainWindow"))
-        item = self.params_table.horizontalHeaderItem(0)
-        item.setText(_translate("MainWindow", "Name"))
         item = self.params_table.horizontalHeaderItem(1)
         item.setText(_translate("MainWindow", "Value"))
+        item = self.params_table.horizontalHeaderItem(2)
+        item.setText(_translate("MainWindow", "Unit"))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab), _translate("MainWindow", "Tab 1"))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_2), _translate("MainWindow", "Tab 2"))

@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>557</width>
-    <height>549</height>
+    <width>798</width>
+    <height>535</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -19,7 +19,7 @@
      <rect>
       <x>0</x>
       <y>0</y>
-      <width>551</width>
+      <width>841</width>
       <height>511</height>
      </rect>
     </property>
@@ -30,28 +30,24 @@
      <attribute name="title">
       <string>Tab 1</string>
      </attribute>
-     <widget class="QListView" name="bookmark_list">
-      <property name="geometry">
-       <rect>
-        <x>0</x>
-        <y>0</y>
-        <width>151</width>
-        <height>481</height>
-       </rect>
-      </property>
-     </widget>
      <widget class="QTableWidget" name="params_table">
       <property name="geometry">
        <rect>
-        <x>160</x>
+        <x>300</x>
         <y>0</y>
-        <width>371</width>
+        <width>491</width>
         <height>481</height>
        </rect>
       </property>
       <column>
        <property name="text">
-        <string>Name</string>
+        <string notr="true">Name</string>
+       </property>
+       <property name="toolTip">
+        <string notr="true"/>
+       </property>
+       <property name="whatsThis">
+        <string notr="true"/>
        </property>
       </column>
       <column>
@@ -59,6 +55,21 @@
         <string>Value</string>
        </property>
       </column>
+      <column>
+       <property name="text">
+        <string>Unit</string>
+       </property>
+      </column>
+     </widget>
+     <widget class="QListWidget" name="list_bookmark">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>0</y>
+        <width>291</width>
+        <height>481</height>
+       </rect>
+      </property>
      </widget>
     </widget>
     <widget class="QWidget" name="tab_2">
@@ -74,8 +85,8 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>557</width>
-     <height>21</height>
+     <width>798</width>
+     <height>18</height>
     </rect>
    </property>
   </widget>
