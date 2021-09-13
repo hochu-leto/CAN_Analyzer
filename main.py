@@ -18,6 +18,7 @@ class ExampleApp(QtWidgets.QMainWindow, CANAnalyzer_ui.Ui_MainWindow):
         self.setupUi(self)  # Это нужно для инициализации нашего дизайна
 
     def list_of_params(self, item):
+        global wr_err
         self.params_table.setRowCount(0)
         self.params_table.setRowCount(len(bookmark_dict[item.text()]))
         row = 0
@@ -25,7 +26,10 @@ class ExampleApp(QtWidgets.QMainWindow, CANAnalyzer_ui.Ui_MainWindow):
             self.params_table.setItem(row, 0, QTableWidgetItem(par['name']))
             value = self.get_param(int(par['address']))
             print(wr_err)
-            self.params_table.setItem(row, 1, QTableWidgetItem(value))
+            if wr_err:
+                wr_err = ''
+            else:
+                self.params_table.setItem(row, 1, QTableWidgetItem(value))
             if str(par['unit']) != 'nan':
                 self.params_table.setItem(row, 2, QTableWidgetItem(str(par['unit'])))
             row += 1
