@@ -2,6 +2,8 @@ import datetime
 import sys
 from pprint import pprint
 
+from PyQt5.QtCore import Qt
+
 sys.path.insert(1, 'C:\\Users\\timofey.inozemtsev\\PycharmProjects\\dll_power')
 
 from dll_power import CANMarathon
@@ -41,7 +43,7 @@ class ExampleApp(QtWidgets.QMainWindow, CANAnalyzer_ui.Ui_MainWindow):
         self.params_table.setRowCount(len(bookmark_dict[item.text()]))
         row = 0
         for par in bookmark_dict[item.text()]:
-            self.params_table.setItem(row, 0, QTableWidgetItem(par['name']))
+            self.params_table.setItem(row, 0, QTableWidgetItem(par['name'])) #.setFlags(Qt.ItemIsSelectable))
             value = get_param(int(par['address']))
             print(value)
             if wr_err:
@@ -49,8 +51,9 @@ class ExampleApp(QtWidgets.QMainWindow, CANAnalyzer_ui.Ui_MainWindow):
             else:
                 self.params_table.setItem(row, 1, QTableWidgetItem(str(value)))
             if str(par['unit']) != 'nan':
-                self.params_table.setItem(row, 2, QTableWidgetItem(str(par['unit'])))
+                self.params_table.setItem(row, 2, QTableWidgetItem(str(par['unit'])).setFlags(Qt.ItemIsSelectable))
             row += 1
+        self.params_table.resizeColumnsToContents()
 
 
 app = QtWidgets.QApplication([])
@@ -78,6 +81,7 @@ for param in params_list:
 marathon = CANMarathon()
 
 window.list_bookmark.itemClicked.connect(window.list_of_params)
+window.params_table.resizeColumnsToContents()
 # marathon.can_write(0x4F5, [0x00, 0x00, 0x00, 0x00, 0x6D, 0x00, 0x2B, 0x03])  # запрос у передней рулевой рейки порядок
 # # передачи байт многобайтных параметров, 0x00 - прямой, 0x01 - обратный
 # marathon.can_read(0x4F7)
