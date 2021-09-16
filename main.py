@@ -12,6 +12,24 @@ import CANAnalyzer_ui
 import pandas as pandas
 
 
+def get_param(address):
+    global wr_err
+    address = int(address)
+    LSB = address & 0xFF
+    MSB = ((address & 0xFF00) >> 8)
+    # print(hex(LSB) + " " + hex(MSB))
+    # if not marathon.can_write(0x4F5, [0, 0, 0, 0, LSB, MSB, 0x2B, 0x03]):
+    #     wr_err = "can't send request"
+    #     return
+    data = marathon.can_request(0x4F5, 0x4F7, [0, 0, 0, 0, LSB, MSB, 0x2B, 0x03])
+    # print((data[1] << 8) + data[0])
+    if data:
+        return (data[1] << 8) + data[0]
+    else:
+        wr_err = "can't read answer"
+        return 'None'
+
+
 class ExampleApp(QtWidgets.QMainWindow, CANAnalyzer_ui.Ui_MainWindow):
     def __init__(self):
         super().__init__()
@@ -24,30 +42,15 @@ class ExampleApp(QtWidgets.QMainWindow, CANAnalyzer_ui.Ui_MainWindow):
         row = 0
         for par in bookmark_dict[item.text()]:
             self.params_table.setItem(row, 0, QTableWidgetItem(par['name']))
-            value = self.get_param(int(par['address']))
-            print(wr_err)
+            value = get_param(int(par['address']))
+            print(value)
             if wr_err:
                 wr_err = ''
             else:
-                self.params_table.setItem(row, 1, QTableWidgetItem(value))
+                self.params_table.setItem(row, 1, QTableWidgetItem(str(value)))
             if str(par['unit']) != 'nan':
                 self.params_table.setItem(row, 2, QTableWidgetItem(str(par['unit'])))
             row += 1
-
-    def get_param(self, address):
-        global wr_err
-        address = int(address)
-        LSB = address & 0xFF
-        MSB = ((address & 0xFF00) >> 8)
-        print(hex(LSB) + " " + hex(MSB))
-        if not marathon.can_write(0x4F5, [0, 0, 0, 0, LSB, MSB, 0x2B, 0x03]):
-            wr_err = "can't send request"
-            return
-        data = marathon.can_read(0x4F7)
-        if data:
-            return (data[1] << 8) + data[0]
-        else:
-            wr_err = "can't read answer"
 
 
 app = QtWidgets.QApplication([])
@@ -106,7 +109,7 @@ def set_param(address: int, value: int):
 def get_all_params():
     for param in params_list:
         if param['address'] != 'nan':
-            param['value'] = window.get_param(address=int(param['address']))
+            param['value'] = get_param(address=int(param['address']))
     if not wr_err:
         return True
     return False
