@@ -43,7 +43,7 @@ class ExampleApp(QtWidgets.QMainWindow, CANAnalyzer_ui.Ui_MainWindow):
         self.params_table.setRowCount(len(bookmark_dict[item.text()]))
         row = 0
         for par in bookmark_dict[item.text()]:
-            self.params_table.setItem(row, 0, QTableWidgetItem(par['name'])) #.setFlags(Qt.ItemIsSelectable))
+            self.params_table.setItem(row, 0, QTableWidgetItem(par['name']))#.setFlags(Qt.ItemIsEditable)
             value = get_param(int(par['address']))
             print(value)
             if wr_err:
