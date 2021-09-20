@@ -42,16 +42,40 @@ class ExampleApp(QtWidgets.QMainWindow, CANAnalyzer_ui.Ui_MainWindow):
         self.params_table.setRowCount(0)
         self.params_table.setRowCount(len(bookmark_dict[item.text()]))
         row = 0
+
         for par in bookmark_dict[item.text()]:
-            self.params_table.setItem(row, 0, QTableWidgetItem(par['name']))#.setFlags(Qt.ItemIsEditable)
+            name_Item = QTableWidgetItem(par['name'])
+            name_Item.setFlags(name_Item.flags() & ~Qt.ItemIsEditable)
+            self.params_table.setItem(row, 0, name_Item)
+            if str(par['description']) != 'nan':
+                description = str(par['description'])
+            else:
+                description = ''
+            description_Item = QTableWidgetItem(description)
+            description_Item.setFlags(description_Item.flags() & ~Qt.ItemIsEditable)
+            self.params_table.setItem(row, 1, description_Item)
+            print(str(par['unit']))
+            if str(par['unit']) != 'nan':
+                unit = str(par['unit'])
+            else:
+                unit = ''
+            unit_Item = QTableWidgetItem(unit)
+            unit_Item.setFlags(unit_Item.flags() & ~Qt.ItemIsEditable)
+            self.params_table.setItem(row, 3, unit_Item)
             value = get_param(int(par['address']))
             print(value)
+            value_Item = QTableWidgetItem(str(value))
+            if str(par['editable']) != 'nan':
+                if int(par['editable']):
+                    value_Item.setFlags(value_Item.flags() | Qt.ItemIsEditable)
+                else:
+                    value_Item.setFlags(value_Item.flags() & ~Qt.ItemIsEditable)
+
             if wr_err:
                 wr_err = ''
             else:
-                self.params_table.setItem(row, 1, QTableWidgetItem(str(value)))
-            if str(par['unit']) != 'nan':
-                self.params_table.setItem(row, 2, QTableWidgetItem(str(par['unit'])).setFlags(Qt.ItemIsSelectable))
+                self.params_table.setItem(row, 2, value_Item)
+
             row += 1
         self.params_table.resizeColumnsToContents()
 
@@ -82,9 +106,6 @@ marathon = CANMarathon()
 
 window.list_bookmark.itemClicked.connect(window.list_of_params)
 window.params_table.resizeColumnsToContents()
-# marathon.can_write(0x4F5, [0x00, 0x00, 0x00, 0x00, 0x6D, 0x00, 0x2B, 0x03])  # запрос у передней рулевой рейки порядок
-# # передачи байт многобайтных параметров, 0x00 - прямой, 0x01 - обратный
-# marathon.can_read(0x4F7)
 
 window.show()  # Показываем окно
 app.exec_()  # и запускаем приложение
@@ -99,6 +120,7 @@ def set_param(address: int, value: int):
             address & 0xFF,
             ((address & 0xFF00) >> 8),
             0x2B, 0x10]
+    pprint(data)
     if marathon.can_write(0x4F5, data):
         for param in params_list:
             if param['address'] == address:
