@@ -3,11 +3,12 @@ import sys
 from pprint import pprint
 
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QBrush
 
 sys.path.insert(1, 'C:\\Users\\timofey.inozemtsev\\PycharmProjects\\dll_power')
 
 from dll_power import CANMarathon
-from PyQt5 import QtWidgets
+from PyQt5 import QtWidgets, QtGui
 from PyQt5.QtWidgets import QTableWidgetItem
 
 import CANAnalyzer_ui
@@ -19,17 +20,33 @@ def get_param(address):
     address = int(address)
     LSB = address & 0xFF
     MSB = ((address & 0xFF00) >> 8)
-    # print(hex(LSB) + " " + hex(MSB))
-    # if not marathon.can_write(0x4F5, [0, 0, 0, 0, LSB, MSB, 0x2B, 0x03]):
-    #     wr_err = "can't send request"
-    #     return
     data = marathon.can_request(0x4F5, 0x4F7, [0, 0, 0, 0, LSB, MSB, 0x2B, 0x03])
-    # print((data[1] << 8) + data[0])
     if data:
         return (data[1] << 8) + data[0]
     else:
         wr_err = "can't read answer"
         return 'None'
+
+
+def get_all_params():
+    for param in params_list:
+        if str(param['address']) != 'nan':
+            param['value'] = get_param(address=int(param['address']))
+    if not wr_err:
+        return True
+    print(wr_err)
+    return False
+
+
+def save_all_params():
+    if get_all_params():
+        file_name = datetime.datetime.now().strftime("%Y-%m-%d_%H_%M_%S")
+        file_name = 'Burr-30_' + file_name + '.xlsx'
+        pandas.DataFrame(params_list).to_excel(file_name, index=False)
+        print(' Save file success')
+        return True
+    print('Fail save file')
+    return False
 
 
 class ExampleApp(QtWidgets.QMainWindow, CANAnalyzer_ui.Ui_MainWindow):
@@ -44,6 +61,7 @@ class ExampleApp(QtWidgets.QMainWindow, CANAnalyzer_ui.Ui_MainWindow):
         row = 0
 
         for par in bookmark_dict[item.text()]:
+
             name_Item = QTableWidgetItem(par['name'])
             name_Item.setFlags(name_Item.flags() & ~Qt.ItemIsEditable)
             self.params_table.setItem(row, 0, name_Item)
@@ -52,9 +70,8 @@ class ExampleApp(QtWidgets.QMainWindow, CANAnalyzer_ui.Ui_MainWindow):
             else:
                 description = ''
             description_Item = QTableWidgetItem(description)
-            description_Item.setFlags(description_Item.flags() & ~Qt.ItemIsEditable)
             self.params_table.setItem(row, 1, description_Item)
-            print(str(par['unit']))
+
             if str(par['unit']) != 'nan':
                 unit = str(par['unit'])
             else:
@@ -62,14 +79,14 @@ class ExampleApp(QtWidgets.QMainWindow, CANAnalyzer_ui.Ui_MainWindow):
             unit_Item = QTableWidgetItem(unit)
             unit_Item.setFlags(unit_Item.flags() & ~Qt.ItemIsEditable)
             self.params_table.setItem(row, 3, unit_Item)
+
             value = get_param(int(par['address']))
-            print(value)
             value_Item = QTableWidgetItem(str(value))
             if str(par['editable']) != 'nan':
-                if int(par['editable']):
-                    value_Item.setFlags(value_Item.flags() | Qt.ItemIsEditable)
-                else:
-                    value_Item.setFlags(value_Item.flags() & ~Qt.ItemIsEditable)
+                value_Item.setFlags(value_Item.flags() | Qt.ItemIsEditable)
+                value_Item.setBackground(QtGui.QColor('#D7FBFF'))  # Qt.gray))
+            else:
+                value_Item.setFlags(value_Item.flags() & ~Qt.ItemIsEditable)
 
             if wr_err:
                 wr_err = ''
@@ -78,6 +95,8 @@ class ExampleApp(QtWidgets.QMainWindow, CANAnalyzer_ui.Ui_MainWindow):
 
             row += 1
         self.params_table.resizeColumnsToContents()
+        self.adjustSize()
+        pprint(self.size())
 
 
 app = QtWidgets.QApplication([])
@@ -85,7 +104,6 @@ window = ExampleApp()  # Создаём объект класса ExampleApp
 
 excel_data_df = pandas.read_excel('burr_30_forw_v31_27072021.xls')
 params_list = excel_data_df.to_dict(orient='records')
-pprint(params_list)
 bookmark_dict = {}
 bookmark_list = []
 prev_name = ''
@@ -103,7 +121,9 @@ for param in params_list:
         prev_name = param['name']
 
 marathon = CANMarathon()
-
+window.adjustSize()
+# window.params_table.keyPressEvent().connect(window.set_par)
+window.pushButton.clicked.connect(save_all_params)
 window.list_bookmark.itemClicked.connect(window.list_of_params)
 window.params_table.resizeColumnsToContents()
 
@@ -131,20 +151,3 @@ def set_param(address: int, value: int):
         wr_err = "can't write param into device"
         return False
 
-
-def get_all_params():
-    for param in params_list:
-        if param['address'] != 'nan':
-            param['value'] = get_param(address=int(param['address']))
-    if not wr_err:
-        return True
-    return False
-
-
-def save_all_params():
-    if get_all_params():
-        file_name = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
-        file_name = 'Burr-30_' + file_name + '.xlsx'
-        pandas.DataFrame(params_list).to_excel(file_name)
-        return True
-    return False
