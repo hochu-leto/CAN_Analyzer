@@ -3,7 +3,6 @@ import sys
 from pprint import pprint
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QBrush
 
 sys.path.insert(1, 'C:\\Users\\timofey.inozemtsev\\PycharmProjects\\dll_power')
 
@@ -15,17 +14,52 @@ import CANAnalyzer_ui
 import pandas as pandas
 
 
+def get_address(name: str):
+    for param in params_list:
+        if str(name) == str(param['name']):
+            return int(param['address'])
+    return 'nan'
+
+
+def check_param(address: int, value):
+    return True
+
+
+def set_param(address: int, value: int):
+    global wr_err
+    address = int(address)
+    value = int(value)
+    data = [value & 0xFF,
+            ((value & 0xFF00) >> 8),
+            0, 0,
+            address & 0xFF,
+            ((address & 0xFF00) >> 8),
+            0x2B, 0x10]
+    print(' Trying to set param in address ' + str(address) + ' to new value ' + str(value))
+    if marathon.can_write(0x4F5, data):
+        for param in params_list:
+            if param['address'] == address:
+                param['value'] = value
+                break
+        return True
+    else:
+        wr_err = "can't write param into device"
+        return False
+
+
 def get_param(address):
     global wr_err
+    request_iteration = 3
     address = int(address)
     LSB = address & 0xFF
     MSB = ((address & 0xFF00) >> 8)
-    data = marathon.can_request(0x4F5, 0x4F7, [0, 0, 0, 0, LSB, MSB, 0x2B, 0x03])
-    if data:
-        return (data[1] << 8) + data[0]
-    else:
-        wr_err = "can't read answer"
-        return 'None'
+    for i in range(request_iteration):  # на случай если не удалось с первого раза поймать параметр,
+        # делаем ещё request_iteration запросов
+        data = marathon.can_request(0x4F5, 0x4F7, [0, 0, 0, 0, LSB, MSB, 0x2B, 0x03])
+        if data:
+            return (data[1] << 8) + data[0]
+    wr_err = "can't read answer"
+    return 'None'
 
 
 def get_all_params():
@@ -56,6 +90,7 @@ class ExampleApp(QtWidgets.QMainWindow, CANAnalyzer_ui.Ui_MainWindow):
 
     def list_of_params(self, item):
         global wr_err
+        self.params_table.itemChanged.disconnect()
         self.params_table.setRowCount(0)
         self.params_table.setRowCount(len(bookmark_dict[item.text()]))
         row = 0
@@ -95,8 +130,18 @@ class ExampleApp(QtWidgets.QMainWindow, CANAnalyzer_ui.Ui_MainWindow):
 
             row += 1
         self.params_table.resizeColumnsToContents()
-        self.adjustSize()
-        pprint(self.size())
+        self.params_table.itemChanged.connect(window.save_item)
+
+    def save_item(self, item):
+        new_value = item.text()
+        name_param = self.params_table.item(item.row(), 0).text()
+        address_param = get_address(name_param)
+        if check_param(address_param, new_value):
+            set_param(address_param, int(new_value))
+            return True
+        else:
+            print("Can't write this value")
+            return False
 
 
 app = QtWidgets.QApplication([])
@@ -121,33 +166,11 @@ for param in params_list:
         prev_name = param['name']
 
 marathon = CANMarathon()
-window.adjustSize()
-# window.params_table.keyPressEvent().connect(window.set_par)
+# window.installEventFilter(window.params_table)
+# window.params_table.itemChanged.connect(window.save_item)
 window.pushButton.clicked.connect(save_all_params)
 window.list_bookmark.itemClicked.connect(window.list_of_params)
 window.params_table.resizeColumnsToContents()
 
 window.show()  # Показываем окно
 app.exec_()  # и запускаем приложение
-
-
-def set_param(address: int, value: int):
-    global wr_err
-    address = int(address)
-    data = [value & 0xFF,
-            ((value & 0xFF00) >> 8),
-            0, 0,
-            address & 0xFF,
-            ((address & 0xFF00) >> 8),
-            0x2B, 0x10]
-    pprint(data)
-    if marathon.can_write(0x4F5, data):
-        for param in params_list:
-            if param['address'] == address:
-                param['value'] = value
-                break
-        return True
-    else:
-        wr_err = "can't write param into device"
-        return False
-
