@@ -21,8 +21,25 @@ def get_address(name: str):
     return 'nan'
 
 
-def check_param(address: int, value):
-    return True
+def check_param(address: int, value):  # если новое значение - часть списка, то
+    int_type_list = ['UINT32', 'UINT16', 'INT32', 'INT16', 'DATE']
+    for param in params_list:
+        if str(param['address']) != 'nan':
+            if param['address'] == address:  # нахожу нужный параметр
+                if str(param['editable']) != 'nan':  # он должен быть изменяемым
+                    if param['type'] in int_type_list:
+                        if isinstance(value, int):
+                            if param['max'] >= value >= param['min']:
+                                return int(value)
+                            else:
+                                print("param is not in range")
+                        else:
+                            print("wrong type of param")
+                    else:
+                        print("wrong type of param")
+                else:
+                    print(f"can't change param {param['name']}")
+    return 'nan'
 
 
 def set_param(address: int, value: int):
@@ -74,7 +91,7 @@ def get_all_params():
 
 def save_all_params():
     if get_all_params():
-        file_name = datetime.datetime.now().strftime("%Y-%m-%d_%H_%M_%S")
+        file_name = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         file_name = 'Burr-30_' + file_name + '.xlsx'
         pandas.DataFrame(params_list).to_excel(file_name, index=False)
         print(' Save file success')
@@ -84,6 +101,11 @@ def save_all_params():
 
 
 class ExampleApp(QtWidgets.QMainWindow, CANAnalyzer_ui.Ui_MainWindow):
+    name_col = 0
+    desc_col = 1
+    value_col = 2
+    unit_col = 3
+
     def __init__(self):
         super().__init__()
         self.setupUi(self)  # Это нужно для инициализации нашего дизайна
@@ -99,13 +121,13 @@ class ExampleApp(QtWidgets.QMainWindow, CANAnalyzer_ui.Ui_MainWindow):
 
             name_Item = QTableWidgetItem(par['name'])
             name_Item.setFlags(name_Item.flags() & ~Qt.ItemIsEditable)
-            self.params_table.setItem(row, 0, name_Item)
+            self.params_table.setItem(row, self.name_col, name_Item)
             if str(par['description']) != 'nan':
                 description = str(par['description'])
             else:
                 description = ''
             description_Item = QTableWidgetItem(description)
-            self.params_table.setItem(row, 1, description_Item)
+            self.params_table.setItem(row, self.desc_col, description_Item)
 
             if str(par['unit']) != 'nan':
                 unit = str(par['unit'])
@@ -113,7 +135,7 @@ class ExampleApp(QtWidgets.QMainWindow, CANAnalyzer_ui.Ui_MainWindow):
                 unit = ''
             unit_Item = QTableWidgetItem(unit)
             unit_Item.setFlags(unit_Item.flags() & ~Qt.ItemIsEditable)
-            self.params_table.setItem(row, 3, unit_Item)
+            self.params_table.setItem(row, self.unit_col, unit_Item)
 
             value = get_param(int(par['address']))
             value_Item = QTableWidgetItem(str(value))
@@ -126,7 +148,7 @@ class ExampleApp(QtWidgets.QMainWindow, CANAnalyzer_ui.Ui_MainWindow):
             if wr_err:
                 wr_err = ''
             else:
-                self.params_table.setItem(row, 2, value_Item)
+                self.params_table.setItem(row, self.value_col, value_Item)
 
             row += 1
         self.params_table.resizeColumnsToContents()
@@ -134,13 +156,30 @@ class ExampleApp(QtWidgets.QMainWindow, CANAnalyzer_ui.Ui_MainWindow):
 
     def save_item(self, item):
         new_value = item.text()
-        name_param = self.params_table.item(item.row(), 0).text()
-        address_param = get_address(name_param)
-        if check_param(address_param, new_value):
-            set_param(address_param, int(new_value))
-            return True
+        name_param = self.params_table.item(item.row(), self.name_col).text()
+        if item.column() == self.value_col:
+            address_param = get_address(name_param)
+            if str(address_param) != 'nan':
+                value = check_param(address_param, new_value)
+                if str(value) != 'nan':
+                    if set_param(address_param, value):
+                        return True
+                    else:
+                        print("Can't write param into device")
+                else:
+                    print("Param isn't in available range")
+            else:
+                print("Can't find this value")
+            return False
+        elif item.column() == self.desc_col:
+            for param in params_list:
+                if name_param == str(param['name']):
+                    param['description'] = new_value
+                    return True
+            print("Can't find this value")
+            return False
         else:
-            print("Can't write this value")
+            print("It's impossible!!!")
             return False
 
 
@@ -167,7 +206,7 @@ for param in params_list:
 
 marathon = CANMarathon()
 # window.installEventFilter(window.params_table)
-# window.params_table.itemChanged.connect(window.save_item)
+window.params_table.itemChanged.connect(window.save_item)
 window.pushButton.clicked.connect(save_all_params)
 window.list_bookmark.itemClicked.connect(window.list_of_params)
 window.params_table.resizeColumnsToContents()
