@@ -3,6 +3,7 @@ import sys
 from pprint import pprint
 
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QColor
 
 sys.path.insert(1, 'C:\\Users\\timofey.inozemtsev\\PycharmProjects\\dll_power')
 
@@ -37,9 +38,12 @@ def check_param(address: int, value):  # если новое значение - 
                         else:
                             print(f"wrong type of param {type(value)}")
                     else:
+
+                        # отработка попадания значения из списка STR и UNION
                         print(f"wrong is not numeric {param['type']}")
                 else:
                     print(f"can't change param {param['name']}")
+
     return 'nan'
 
 
@@ -141,28 +145,38 @@ class ExampleApp(QtWidgets.QMainWindow, CANAnalyzer_ui.Ui_MainWindow):
             self.params_table.setItem(row, self.unit_col, unit_Item)
 
             value = get_param(int(par['address']))
-            value_Item = QTableWidgetItem(str(value))
-            if str(par['editable']) != 'nan':
-                value_Item.setFlags(value_Item.flags() | Qt.ItemIsEditable)
-                value_Item.setBackground(QtGui.QColor('#D7FBFF'))  # Qt.gray))
-            else:
-                value_Item.setFlags(value_Item.flags() & ~Qt.ItemIsEditable)
 
             if wr_err:
                 wr_err = ''
             else:
-                self.params_table.setItem(row, self.value_col, value_Item)
-
-            if str(par['strings']) != 'nan':
-                string_dict = {}
-                for item in par['strings'].strip().split(';'):
-                    if item:
-                        it = item.split('-')
-                        string_dict[it[0]] = it[1]
-                combo_list = QComboBox()
-                for st in string_dict.values():
-                    combo_list.addItem(st)
-                self.params_table.setCellWidget(row, self.combo_col, combo_list)
+                if str(par['strings']) == 'nan':
+                    value_Item = QTableWidgetItem(str(value))
+                    if str(par['editable']) != 'nan':
+                        value_Item.setFlags(value_Item.flags() | Qt.ItemIsEditable)
+                        value_Item.setBackground(QColor('#D7FBFF'))
+                    else:
+                        value_Item.setFlags(value_Item.flags() & ~Qt.ItemIsEditable)
+                    self.params_table.setItem(row, self.value_col, value_Item)
+                else:
+                    string_dict = {}
+                    for item in par['strings'].strip().split(';'):
+                        if item:
+                            it = item.split('-')
+                            string_dict[int(it[0].strip())] = it[1]
+                    combo_list = QComboBox()
+                    for st in string_dict.values():
+                        combo_list.addItem(st)
+                    if value != 'None':
+                        combo_list.setCurrentIndex(value)
+                    if str(par['editable']) != 'nan':
+                        combo_list.setEditable(True)
+                        pal = combo_list.palette()
+                        from PyQt5.QtGui import QPalette
+                        pal.setColor(QPalette.setColor(), QColor('#D7FBFF'))
+                        combo_list.setPalette(pal)
+                    else:
+                        combo_list.setEditable(False)
+                    self.params_table.setCellWidget(row, self.value_col, combo_list)
 
             row += 1
         self.params_table.resizeColumnsToContents()
@@ -170,6 +184,7 @@ class ExampleApp(QtWidgets.QMainWindow, CANAnalyzer_ui.Ui_MainWindow):
 
     def save_item(self, item):
         new_value = item.text()
+        print(new_value)
         name_param = self.params_table.item(item.row(), self.name_col).text()
         if item.column() == self.value_col:
             address_param = get_address(name_param)
