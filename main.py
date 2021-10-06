@@ -38,9 +38,14 @@ def check_param(address: int, value):  # если новое значение - 
                         else:
                             print(f"wrong type of param {type(value)}")
                     else:
-
                         # отработка попадания значения из списка STR и UNION
-                        print(f"wrong is not numeric {param['type']}")
+                        print(f"value is not numeric {param['type']}")
+                        string_dict = {}
+                        for item in param['strings'].strip().split(';'):
+                            if item:
+                                it = item.split('-')
+                                string_dict[it[1].strip()] = int(it[0].strip())
+                        return string_dict[value.strip()]
                 else:
                     print(f"can't change param {param['name']}")
 
@@ -110,8 +115,8 @@ class ExampleApp(QtWidgets.QMainWindow, CANAnalyzer_ui.Ui_MainWindow):
     name_col = 0
     desc_col = 1
     value_col = 2
-    combo_col = 3
-    unit_col = 4
+    combo_col = 999
+    unit_col = 3
 
     def __init__(self):
         super().__init__()
@@ -149,34 +154,31 @@ class ExampleApp(QtWidgets.QMainWindow, CANAnalyzer_ui.Ui_MainWindow):
             if wr_err:
                 wr_err = ''
             else:
-                if str(par['strings']) == 'nan':
-                    value_Item = QTableWidgetItem(str(value))
-                    if str(par['editable']) != 'nan':
-                        value_Item.setFlags(value_Item.flags() | Qt.ItemIsEditable)
-                        value_Item.setBackground(QColor('#D7FBFF'))
-                    else:
-                        value_Item.setFlags(value_Item.flags() & ~Qt.ItemIsEditable)
-                    self.params_table.setItem(row, self.value_col, value_Item)
-                else:
+                combo_list = QComboBox()
+                if str(par['strings']) != 'nan':  # если у нас есть список
                     string_dict = {}
                     for item in par['strings'].strip().split(';'):
                         if item:
                             it = item.split('-')
                             string_dict[int(it[0].strip())] = it[1]
-                    combo_list = QComboBox()
                     for st in string_dict.values():
                         combo_list.addItem(st)
                     if value != 'None':
                         combo_list.setCurrentIndex(value)
-                    if str(par['editable']) != 'nan':
-                        combo_list.setEditable(True)
-                        pal = combo_list.palette()
-                        from PyQt5.QtGui import QPalette
-                        pal.setColor(QPalette.setColor(), QColor('#D7FBFF'))
-                        combo_list.setPalette(pal)
+                    value = string_dict[value]
+
+                value_Item = QTableWidgetItem(str(value))
+
+                if str(par['editable']) != 'nan':
+                    if str(par['strings']) == 'nan':
+                        value_Item.setFlags(value_Item.flags() | Qt.ItemIsEditable)
+                        value_Item.setBackground(QColor('#D7FBFF'))
+                        self.params_table.setItem(row, self.value_col, value_Item)
                     else:
-                        combo_list.setEditable(False)
-                    self.params_table.setCellWidget(row, self.value_col, combo_list)
+                        self.params_table.setCellWidget(row, self.value_col, combo_list)
+                else:
+                    value_Item.setFlags(value_Item.flags() & ~Qt.ItemIsEditable)
+                    self.params_table.setItem(row, self.value_col, value_Item)
 
             row += 1
         self.params_table.resizeColumnsToContents()
@@ -184,18 +186,23 @@ class ExampleApp(QtWidgets.QMainWindow, CANAnalyzer_ui.Ui_MainWindow):
 
     def save_item(self, item):
         new_value = item.text()
-        print(new_value)
         name_param = self.params_table.item(item.row(), self.name_col).text()
         if item.column() == self.value_col:
             address_param = get_address(name_param)
             if str(address_param) != 'nan':
                 value = check_param(address_param, new_value)
                 if str(value) != 'nan':  # прошёл проверку
-                    if set_param(address_param, value):
-
-                        return True
-                    else:
-                        print("Can't write param into device")
+                    for i in range(3):
+                        if set_param(address_param, value):
+                            check_value = get_param(address_param)
+                            if check_value == value:
+                                self.params_table.item(item.row(), self.name_col).setBackground(QColor('#D7FBFF'))
+                                return True
+                            else:
+                                self.params_table.item(item.row(), self.name_col).setBackground(QColor('red'))
+                        else:
+                            print("Can't write param into device")
+                    return False
                 else:
                     print("Param isn't in available range")
             else:
