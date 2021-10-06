@@ -8,7 +8,7 @@ sys.path.insert(1, 'C:\\Users\\timofey.inozemtsev\\PycharmProjects\\dll_power')
 
 from dll_power import CANMarathon
 from PyQt5 import QtWidgets, QtGui
-from PyQt5.QtWidgets import QTableWidgetItem
+from PyQt5.QtWidgets import QTableWidgetItem, QComboBox
 
 import CANAnalyzer_ui
 import pandas as pandas
@@ -27,16 +27,17 @@ def check_param(address: int, value):  # если новое значение - 
         if str(param['address']) != 'nan':
             if param['address'] == address:  # нахожу нужный параметр
                 if str(param['editable']) != 'nan':  # он должен быть изменяемым
-                    if param['type'] in int_type_list:
-                        if isinstance(value, int):
-                            if param['max'] >= value >= param['min']:
-                                return int(value)
+                    if param['type'] in int_type_list:  # если он в списке интов
+                        if value.isdigit:  # и переменная - число
+                            value = int(value)
+                            if int(param['max']) >= value >= int(param['min']):  # причём это число в зоне допустимого
+                                return value  # ну тогда так у ж и быть - отдаём это число
                             else:
-                                print("param is not in range")
+                                print(f"param {value} is not in range from {param['min']} to {param['max']}")
                         else:
-                            print("wrong type of param")
+                            print(f"wrong type of param {type(value)}")
                     else:
-                        print("wrong type of param")
+                        print(f"wrong is not numeric {param['type']}")
                 else:
                     print(f"can't change param {param['name']}")
     return 'nan'
@@ -54,11 +55,12 @@ def set_param(address: int, value: int):
             0x2B, 0x10]
     print(' Trying to set param in address ' + str(address) + ' to new value ' + str(value))
     if marathon.can_write(0x4F5, data):
+        print(f'Successfully updated param in address {address} into devise')
         for param in params_list:
             if param['address'] == address:
                 param['value'] = value
-                break
-        return True
+                print(f'Successfully written new value {value} in {param["name"]}')
+                return True
     else:
         wr_err = "can't write param into device"
         return False
@@ -104,7 +106,8 @@ class ExampleApp(QtWidgets.QMainWindow, CANAnalyzer_ui.Ui_MainWindow):
     name_col = 0
     desc_col = 1
     value_col = 2
-    unit_col = 3
+    combo_col = 3
+    unit_col = 4
 
     def __init__(self):
         super().__init__()
@@ -150,6 +153,17 @@ class ExampleApp(QtWidgets.QMainWindow, CANAnalyzer_ui.Ui_MainWindow):
             else:
                 self.params_table.setItem(row, self.value_col, value_Item)
 
+            if str(par['strings']) != 'nan':
+                string_dict = {}
+                for item in par['strings'].strip().split(';'):
+                    if item:
+                        it = item.split('-')
+                        string_dict[it[0]] = it[1]
+                combo_list = QComboBox()
+                for st in string_dict.values():
+                    combo_list.addItem(st)
+                self.params_table.setCellWidget(row, self.combo_col, combo_list)
+
             row += 1
         self.params_table.resizeColumnsToContents()
         self.params_table.itemChanged.connect(window.save_item)
@@ -161,8 +175,9 @@ class ExampleApp(QtWidgets.QMainWindow, CANAnalyzer_ui.Ui_MainWindow):
             address_param = get_address(name_param)
             if str(address_param) != 'nan':
                 value = check_param(address_param, new_value)
-                if str(value) != 'nan':
+                if str(value) != 'nan':  # прошёл проверку
                     if set_param(address_param, value):
+
                         return True
                     else:
                         print("Can't write param into device")
