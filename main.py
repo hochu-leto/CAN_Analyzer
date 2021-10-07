@@ -18,9 +18,11 @@ Front_Wheel = 0x4F5
 Rear_Wheel = 0x4F6
 current_wheel = Front_Wheel
 
+
 def update_param():
     param_list_clear()
     window.list_of_params(window.list_bookmark.currentItem())
+
 
 def param_list_clear():
     for param in params_list:
@@ -68,7 +70,6 @@ def check_param(address: int, value):  # если новое значение - 
                         return string_dict[value.strip()]
                 else:
                     print(f"can't change param {param['name']}")
-
     return 'nan'
 
 
@@ -224,12 +225,20 @@ class ExampleApp(QtWidgets.QMainWindow, CANAnalyzer_ui.Ui_MainWindow):
                         if set_param(address_param, value):
                             check_value = get_param(address_param)
                             if check_value == value:
+                                print('Checked changed value - OK')
                                 self.params_table.item(item.row(), self.value_col).setBackground(QColor('green'))
                                 return True
                             else:
                                 self.params_table.item(item.row(), self.value_col).setBackground(QColor('red'))
                         else:
                             print("Can't write param into device")
+                    if address_param == 35:  # если произошла смена рейки, нужно поменять адреса
+                        if self.radioButton.isChecked():
+                            self.radioButton_2.setChecked()
+                        else:
+                            self.radioButton.setChecked()
+                        rb_clicked()
+                        return True
                     return False
                 else:
                     print("Param isn't in available range")
