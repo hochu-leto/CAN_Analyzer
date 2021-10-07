@@ -14,6 +14,29 @@ from PyQt5.QtWidgets import QTableWidgetItem, QComboBox
 import CANAnalyzer_ui
 import pandas as pandas
 
+Front_Wheel = 0x4F5
+Rear_Wheel = 0x4F6
+current_wheel = Front_Wheel
+
+def update_param():
+    param_list_clear()
+    window.list_of_params(window.list_bookmark.currentItem())
+
+def param_list_clear():
+    for param in params_list:
+        param['value'] = 'nan'
+    return True
+
+
+def rb_clicked():
+    global current_wheel
+    if window.radioButton.isChecked():
+        current_wheel = Front_Wheel
+    elif window.radioButton_2.isChecked():
+        current_wheel = Rear_Wheel
+    update_param()
+    return True
+
 
 def get_address(name: str):
     for param in params_list:
@@ -28,15 +51,12 @@ def check_param(address: int, value):  # если новое значение - 
         if str(param['address']) != 'nan':
             if param['address'] == address:  # нахожу нужный параметр
                 if str(param['editable']) != 'nan':  # он должен быть изменяемым
-                    if param['type'] in int_type_list:  # если он в списке интов
-                        if value.isdigit:  # и переменная - число
-                            value = int(value)
-                            if int(param['max']) >= value >= int(param['min']):  # причём это число в зоне допустимого
-                                return value  # ну тогда так у ж и быть - отдаём это число
-                            else:
-                                print(f"param {value} is not in range from {param['min']} to {param['max']}")
-                        else:
-                            print(f"wrong type of param {type(value)}")
+                    if value.isdigit:  # и переменная - число
+                        value = int(value)
+                        # if int(param['max']) >= value >= int(param['min']):  # причём это число в зоне допустимого
+                        return value  # ну тогда так у ж и быть - отдаём это число
+                        # else:
+                        #     print(f"param {value} is not in range from {param['min']} to {param['max']}")
                     else:
                         # отработка попадания значения из списка STR и UNION
                         print(f"value is not numeric {param['type']}")
@@ -63,7 +83,7 @@ def set_param(address: int, value: int):
             ((address & 0xFF00) >> 8),
             0x2B, 0x10]
     print(' Trying to set param in address ' + str(address) + ' to new value ' + str(value))
-    if marathon.can_write(0x4F5, data):
+    if marathon.can_write(current_wheel, data):
         print(f'Successfully updated param in address {address} into devise')
         for param in params_list:
             if param['address'] == address:
@@ -83,7 +103,7 @@ def get_param(address):
     MSB = ((address & 0xFF00) >> 8)
     for i in range(request_iteration):  # на случай если не удалось с первого раза поймать параметр,
         # делаем ещё request_iteration запросов
-        data = marathon.can_request(0x4F5, 0x4F7, [0, 0, 0, 0, LSB, MSB, 0x2B, 0x03])
+        data = marathon.can_request(current_wheel, current_wheel + 2, [0, 0, 0, 0, LSB, MSB, 0x2B, 0x03])
         if data:
             return (data[1] << 8) + data[0]
     wr_err = "can't read answer"
@@ -93,7 +113,8 @@ def get_param(address):
 def get_all_params():
     for param in params_list:
         if str(param['address']) != 'nan':
-            param['value'] = get_param(address=int(param['address']))
+            if str(param['value']) == 'nan':
+                param['value'] = get_param(address=int(param['address']))
     if not wr_err:
         return True
     print(wr_err)
@@ -149,22 +170,26 @@ class ExampleApp(QtWidgets.QMainWindow, CANAnalyzer_ui.Ui_MainWindow):
             unit_Item.setFlags(unit_Item.flags() & ~Qt.ItemIsEditable)
             self.params_table.setItem(row, self.unit_col, unit_Item)
 
-            value = get_param(int(par['address']))
+            if str(par['value']) == 'nan':
+                value = get_param(int(par['address']))
+                par['value'] = value
+            else:
+                value = par['value']
 
             if wr_err:
                 wr_err = ''
             else:
-                combo_list = QComboBox()
-                if str(par['strings']) != 'nan':  # если у нас есть список
-                    string_dict = {}
-                    for item in par['strings'].strip().split(';'):
-                        if item:
-                            it = item.split('-')
-                            string_dict[int(it[0].strip())] = it[1]
-                    for st in string_dict.values():
-                        combo_list.addItem(st)
-                    if value != 'None':
-                        combo_list.setCurrentIndex(value)
+                # combo_list = QComboBox()
+                # if str(par['strings']) != 'nan':  # если у нас есть список
+                #     string_dict = {}
+                #     for item in par['strings'].strip().split(';'):
+                #         if item:
+                #             it = item.split('-')
+                #             string_dict[int(it[0].strip())] = it[1]
+                #     for st in string_dict.values():
+                #         combo_list.addItem(st)
+                #     if value != 'None':
+                #         combo_list.setCurrentIndex(value)
 
                 value_Item = QTableWidgetItem(str(value))
 
@@ -174,8 +199,9 @@ class ExampleApp(QtWidgets.QMainWindow, CANAnalyzer_ui.Ui_MainWindow):
                 else:
                     value_Item.setFlags(value_Item.flags() & ~Qt.ItemIsEditable)
 
-                if str(par['strings']) == 'nan':
+                if str(par['strings']) != 'nan':
                     value_Item.setStatusTip(str(par['strings']))
+                    value_Item.setToolTip(str(par['strings']))
 
                 self.params_table.setItem(row, self.value_col, value_Item)
 
@@ -198,10 +224,10 @@ class ExampleApp(QtWidgets.QMainWindow, CANAnalyzer_ui.Ui_MainWindow):
                         if set_param(address_param, value):
                             check_value = get_param(address_param)
                             if check_value == value:
-                                self.params_table.item(item.row(), self.name_col).setBackground(QColor('#D7FBFF'))
+                                self.params_table.item(item.row(), self.value_col).setBackground(QColor('green'))
                                 return True
                             else:
-                                self.params_table.item(item.row(), self.name_col).setBackground(QColor('red'))
+                                self.params_table.item(item.row(), self.value_col).setBackground(QColor('red'))
                         else:
                             print("Can't write param into device")
                     return False
@@ -245,8 +271,13 @@ for param in params_list:
 
 marathon = CANMarathon()
 # window.installEventFilter(window.params_table)
+window.radioButton.toggled.connect(rb_clicked)
+window.radioButton_2.toggled.connect(rb_clicked)
+
 window.params_table.itemChanged.connect(window.save_item)
 window.pushButton.clicked.connect(save_all_params)
+window.pushButton_2.clicked.connect(update_param)
+
 window.list_bookmark.itemClicked.connect(window.list_of_params)
 window.params_table.resizeColumnsToContents()
 
