@@ -290,5 +290,6 @@ window.pushButton_2.clicked.connect(update_param)
 window.list_bookmark.itemClicked.connect(window.list_of_params)
 window.params_table.resizeColumnsToContents()
 
+
 window.show()  # Показываем окно
 app.exec_()  # и запускаем приложение
