@@ -18,10 +18,46 @@ Front_Wheel = 0x4F5
 Rear_Wheel = 0x4F6
 current_wheel = Front_Wheel
 
+often_used_params = {
+    'zone_of_insensitivity': {'scale': 100,
+                              'value': 0,
+                              'address': 103,
+                              'min': 1,
+                              'max': 5},
+    'warning_temperature': {'scale': 1,
+                            'value': 0,
+                            'address': 104,
+                            'min': 30,
+                            'max': 80},
+    'warning_current': {'scale': 10,
+                        'value': 0,
+                        'address': 105,
+                        'min': 10,
+                        'max': 60},
+    'cut_off_current': {'scale': 10,
+                        'value': 0,
+                        'address': 403,
+                        'min': 20,
+                        'max': 80},
+    'current_wheel': {'scale': 'nan',
+                      'value': 0,
+                      'address': 35},
+    'byte_order': {'scale': 'nan',
+                   'value': 0,
+                   'address': 109},
+}
+
+
+def update_often_used():
+    pass
+
 
 def update_param():
-    param_list_clear()
-    window.list_of_params(window.list_bookmark.currentItem())
+    if window.tab_burr.currentWidget() == window.often_used_params:
+        window.best_params()
+    elif window.tab_burr.currentWidget() == window.all_params:
+        param_list_clear()
+        window.list_of_params(window.list_bookmark.currentItem())
 
 
 def param_list_clear():
@@ -108,7 +144,7 @@ def get_param(address):
         if data:
             return (data[1] << 8) + data[0]
     wr_err = "can't read answer"
-    return 'None'
+    return 'nan'
 
 
 def get_all_params():
@@ -144,14 +180,30 @@ class ExampleApp(QtWidgets.QMainWindow, CANAnalyzer_ui.Ui_MainWindow):
         super().__init__()
         self.setupUi(self)  # Это нужно для инициализации нашего дизайна
 
+    def best_params(self):
+        for name, par in often_used_params.items():
+            par['value'] = get_param(int(par['address']))
+            if par['scale'] != 'nan':
+                slider = getattr(self, name)
+                slider.setMinimum(par['min'])
+                slider.setMaximum(par['max'])
+                if par['value'] != 'nan':
+                    param = par['value'] / par['scale']
+                else:
+                    param = par['max']
+                print(f'Param {name} is {param}')
+                slider.setValue(param)
+                # self.warning_current.setValue(param)
+
     def list_of_params(self, item):
+        item = bookmark_dict[item.text()]
         global wr_err
         self.params_table.itemChanged.disconnect()
         self.params_table.setRowCount(0)
-        self.params_table.setRowCount(len(bookmark_dict[item.text()]))
+        self.params_table.setRowCount(len(item))
         row = 0
 
-        for par in bookmark_dict[item.text()]:
+        for par in item:
 
             name_Item = QTableWidgetItem(par['name'])
             name_Item.setFlags(name_Item.flags() & ~Qt.ItemIsEditable)
@@ -279,7 +331,6 @@ for param in params_list:
         prev_name = param['name']
 
 marathon = CANMarathon()
-# window.installEventFilter(window.params_table)
 window.radioButton.toggled.connect(rb_clicked)
 window.radioButton_2.toggled.connect(rb_clicked)
 
@@ -289,7 +340,6 @@ window.pushButton_2.clicked.connect(update_param)
 
 window.list_bookmark.itemClicked.connect(window.list_of_params)
 window.params_table.resizeColumnsToContents()
-
 
 window.show()  # Показываем окно
 app.exec_()  # и запускаем приложение
