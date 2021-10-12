@@ -23,22 +23,26 @@ often_used_params = {
                               'value': 0,
                               'address': 103,
                               'min': 1,
-                              'max': 5},
+                              'max': 5,
+                              'unit': '%'},
     'warning_temperature': {'scale': 1,
                             'value': 0,
                             'address': 104,
                             'min': 30,
-                            'max': 80},
-    'warning_current': {'scale': 10,
+                            'max': 80,
+                            'unit': u'\N{DEGREE SIGN}'},
+    'warning_current': {'scale': 100,
                         'value': 0,
                         'address': 105,
                         'min': 10,
-                        'max': 60},
-    'cut_off_current': {'scale': 10,
+                        'max': 60,
+                        'unit': 'A'},
+    'cut_off_current': {'scale': 100,
                         'value': 0,
                         'address': 403,
                         'min': 20,
-                        'max': 80},
+                        'max': 80,
+                        'unit': 'A'},
     'current_wheel': {'scale': 'nan',
                       'value': 0,
                       'address': 35},
@@ -48,13 +52,47 @@ often_used_params = {
 }
 
 
-def update_often_used():
+def show_empty_params_list(list_of_params: list, table: str):
+    show_table = getattr(window, table)
+    show_table.itemChanged.disconnect()
+    show_table.setRowCount(0)
+    show_table.setRowCount(len(list_of_params))
+    row = 0
+
+    for par in list_of_params:
+
+        name_Item = QTableWidgetItem(par['name'])
+        name_Item.setFlags(name_Item.flags() & ~Qt.ItemIsEditable)
+        show_table.setItem(row, 0, name_Item)
+        if str(par['description']) != 'nan':
+            description = str(par['description'])
+        else:
+            description = ''
+        description_Item = QTableWidgetItem(description)
+        show_table.setItem(row, 1, description_Item)
+
+        if str(par['unit']) != 'nan':
+            unit = str(par['unit'])
+        else:
+            unit = ''
+        unit_Item = QTableWidgetItem(unit)
+        unit_Item.setFlags(unit_Item.flags() & ~Qt.ItemIsEditable)
+        show_table.setItem(row, show_table.columnCount() - 1, unit_Item)
+
+        row += 1
+    show_table.resizeColumnsToContents()
+    show_table.itemChanged.connect(window.save_item)
+
+
+def update_editable_param():
     pass
 
 
 def update_param():
     if window.tab_burr.currentWidget() == window.often_used_params:
         window.best_params()
+    elif window.tab_burr.currentWidget() == window.editable_params:
+        show_empty_params_list(editable_params_list, 'params_table_2')
     elif window.tab_burr.currentWidget() == window.all_params:
         param_list_clear()
         window.list_of_params(window.list_bookmark.currentItem())
@@ -181,19 +219,36 @@ class ExampleApp(QtWidgets.QMainWindow, CANAnalyzer_ui.Ui_MainWindow):
         self.setupUi(self)  # Это нужно для инициализации нашего дизайна
 
     def best_params(self):
+        self.lb_soft_version.setText('Версия ПО БУРР ' + str(get_param(42)))
+
+        cur_wheel = get_param(35)
+        if cur_wheel == 2:
+            self.front_wheel.setChecked(True)
+        elif cur_wheel == 3:
+            self.rear_wheel.setChecked(True)
+
+        byte_order = get_param(109)
+        if byte_order == 0:
+            self.rb_big_endian.setChecked(True)
+        elif byte_order == 1:
+            self.rb_little_endian.setChecked(True)
+
         for name, par in often_used_params.items():
             par['value'] = get_param(int(par['address']))
             if par['scale'] != 'nan':
                 slider = getattr(self, name)
-                slider.setMinimum(par['min'])
-                slider.setMaximum(par['max'])
+                slider.setMinimum(par['min'] * par['scale'])
+                slider.setMaximum(par['max'] * par['scale'])
+                slider.setTickInterval(1)
+                label = getattr(self, 'lab_' + name)
                 if par['value'] != 'nan':
-                    param = par['value'] / par['scale']
+                    param = par['value']
                 else:
-                    param = par['max']
+                    param = par['max'] * par['scale']
                 print(f'Param {name} is {param}')
                 slider.setValue(param)
-                # self.warning_current.setValue(param)
+                param = param / par['scale']
+                label.setText(str(param) + par['unit'])
 
     def list_of_params(self, item):
         item = bookmark_dict[item.text()]
@@ -318,8 +373,10 @@ bookmark_dict = {}
 bookmark_list = []
 prev_name = ''
 wr_err = ''
-
+editable_params_list = []
 for param in params_list:
+    if str(param['editable']) != 'nan':
+        editable_params_list.append(param)
     if param['code'].count('.') == 2:
         param['address'] = int(param['address'])
         bookmark_list.append(param)
@@ -335,6 +392,7 @@ window.radioButton.toggled.connect(rb_clicked)
 window.radioButton_2.toggled.connect(rb_clicked)
 
 window.params_table.itemChanged.connect(window.save_item)
+window.params_table_2.itemChanged.connect(update_editable_param)
 window.pushButton.clicked.connect(save_all_params)
 window.pushButton_2.clicked.connect(update_param)
 
