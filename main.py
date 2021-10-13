@@ -396,6 +396,9 @@ window.params_table_2.itemChanged.connect(update_editable_param)
 window.pushButton.clicked.connect(save_all_params)
 window.pushButton_2.clicked.connect(update_param)
 
+window.list_bookmark.setCurrentRow(0)
+show_empty_params_list(bookmark_dict[window.list_bookmark.currentItem().text()], 'params_table')
+show_empty_params_list(editable_params_list, 'params_table_2')
 window.list_bookmark.itemClicked.connect(window.list_of_params)
 window.params_table.resizeColumnsToContents()
 
