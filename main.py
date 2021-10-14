@@ -9,7 +9,7 @@ sys.path.insert(1, 'C:\\Users\\timofey.inozemtsev\\PycharmProjects\\dll_power')
 
 from dll_power import CANMarathon
 from PyQt5 import QtWidgets, QtGui
-from PyQt5.QtWidgets import QTableWidgetItem, QComboBox
+from PyQt5.QtWidgets import QTableWidgetItem, QComboBox, QApplication
 
 import CANAnalyzer_ui
 import pandas as pandas
@@ -43,13 +43,51 @@ often_used_params = {
                         'min': 20,
                         'max': 80,
                         'unit': 'A'},
-    'current_wheel': {'scale': 'nan',
-                      'value': 0,
-                      'address': 35},
-    'byte_order': {'scale': 'nan',
-                   'value': 0,
-                   'address': 109},
 }
+rb_param_list = {'current_wheel': {'scale': 'nan',
+                                   'value': 0,
+                                   'address': 35},
+                 'byte_order': {'scale': 'nan',
+                                'value': 0,
+                                'address': 109},
+                 }
+
+
+def show_value(col_value: int, list_of_params: list, table: str):
+    global wr_err
+    show_table = getattr(window, table)
+    show_table.itemChanged.disconnect()
+
+    row = 0
+
+    for par in list_of_params:
+        if str(par['value']) == 'nan':
+            value = get_param(int(par['address']))
+            par['value'] = value
+        else:
+            value = par['value']
+
+        if wr_err:
+            print(wr_err)
+            wr_err = ''
+        else:
+            value_Item = QTableWidgetItem(str(value))
+
+            if str(par['editable']) != 'nan':
+                value_Item.setFlags(value_Item.flags() | Qt.ItemIsEditable)
+                value_Item.setBackground(QColor('#D7FBFF'))
+            else:
+                value_Item.setFlags(value_Item.flags() & ~Qt.ItemIsEditable)
+
+            if str(par['strings']) != 'nan':
+                value_Item.setStatusTip(str(par['strings']))
+                value_Item.setToolTip(str(par['strings']))
+
+            show_table.setItem(row, col_value, value_Item)
+
+        row += 1
+    show_table.resizeColumnsToContents()
+    show_table.itemChanged.connect(window.save_item)
 
 
 def show_empty_params_list(list_of_params: list, table: str):
@@ -93,9 +131,10 @@ def update_param():
         window.best_params()
     elif window.tab_burr.currentWidget() == window.editable_params:
         show_empty_params_list(editable_params_list, 'params_table_2')
+        show_value(2, editable_params_list, 'params_table_2')
     elif window.tab_burr.currentWidget() == window.all_params:
         param_list_clear()
-        window.list_of_params(window.list_bookmark.currentItem())
+        window.list_of_params_table(window.list_bookmark.currentItem())
 
 
 def param_list_clear():
@@ -218,6 +257,17 @@ class ExampleApp(QtWidgets.QMainWindow, CANAnalyzer_ui.Ui_MainWindow):
         super().__init__()
         self.setupUi(self)  # Это нужно для инициализации нашего дизайна
 
+    def move_slider(self, item):
+        slider = QApplication.instance().sender()
+        # item = slider.value()
+        param = slider.objectName()
+        value = item / often_used_params[param]['scale']
+        print(f'New {param} is {item}')
+        label = getattr(self, 'lab_' + param)
+        label.setText(str(value) + often_used_params[param]['unit'])
+
+        pass
+
     def best_params(self):
         self.lb_soft_version.setText('Версия ПО БУРР ' + str(get_param(42)))
 
@@ -237,9 +287,6 @@ class ExampleApp(QtWidgets.QMainWindow, CANAnalyzer_ui.Ui_MainWindow):
             par['value'] = get_param(int(par['address']))
             if par['scale'] != 'nan':
                 slider = getattr(self, name)
-                slider.setMinimum(par['min'] * par['scale'])
-                slider.setMaximum(par['max'] * par['scale'])
-                slider.setTickInterval(1)
                 label = getattr(self, 'lab_' + name)
                 if par['value'] != 'nan':
                     param = par['value']
@@ -250,72 +297,42 @@ class ExampleApp(QtWidgets.QMainWindow, CANAnalyzer_ui.Ui_MainWindow):
                 param = param / par['scale']
                 label.setText(str(param) + par['unit'])
 
-    def list_of_params(self, item):
+    def list_of_params_table(self, item):
         item = bookmark_dict[item.text()]
-        global wr_err
-        self.params_table.itemChanged.disconnect()
-        self.params_table.setRowCount(0)
-        self.params_table.setRowCount(len(item))
-        row = 0
-
-        for par in item:
-
-            name_Item = QTableWidgetItem(par['name'])
-            name_Item.setFlags(name_Item.flags() & ~Qt.ItemIsEditable)
-            self.params_table.setItem(row, self.name_col, name_Item)
-            if str(par['description']) != 'nan':
-                description = str(par['description'])
-            else:
-                description = ''
-            description_Item = QTableWidgetItem(description)
-            self.params_table.setItem(row, self.desc_col, description_Item)
-
-            if str(par['unit']) != 'nan':
-                unit = str(par['unit'])
-            else:
-                unit = ''
-            unit_Item = QTableWidgetItem(unit)
-            unit_Item.setFlags(unit_Item.flags() & ~Qt.ItemIsEditable)
-            self.params_table.setItem(row, self.unit_col, unit_Item)
-
-            if str(par['value']) == 'nan':
-                value = get_param(int(par['address']))
-                par['value'] = value
-            else:
-                value = par['value']
-
-            if wr_err:
-                wr_err = ''
-            else:
-                # combo_list = QComboBox()
-                # if str(par['strings']) != 'nan':  # если у нас есть список
-                #     string_dict = {}
-                #     for item in par['strings'].strip().split(';'):
-                #         if item:
-                #             it = item.split('-')
-                #             string_dict[int(it[0].strip())] = it[1]
-                #     for st in string_dict.values():
-                #         combo_list.addItem(st)
-                #     if value != 'None':
-                #         combo_list.setCurrentIndex(value)
-
-                value_Item = QTableWidgetItem(str(value))
-
-                if str(par['editable']) != 'nan':
-                    value_Item.setFlags(value_Item.flags() | Qt.ItemIsEditable)
-                    value_Item.setBackground(QColor('#D7FBFF'))
-                else:
-                    value_Item.setFlags(value_Item.flags() & ~Qt.ItemIsEditable)
-
-                if str(par['strings']) != 'nan':
-                    value_Item.setStatusTip(str(par['strings']))
-                    value_Item.setToolTip(str(par['strings']))
-
-                self.params_table.setItem(row, self.value_col, value_Item)
-
-            row += 1
-        self.params_table.resizeColumnsToContents()
-        self.params_table.itemChanged.connect(window.save_item)
+        show_empty_params_list(item, 'params_table')
+        show_value(2, item, 'params_table')
+        # global wr_err
+        # self.params_table.itemChanged.disconnect()
+        #
+        # row = 0
+        #
+        # for par in item:
+        #     if str(par['value']) == 'nan':
+        #         value = get_param(int(par['address']))
+        #         par['value'] = value
+        #     else:
+        #         value = par['value']
+        #
+        #     if wr_err:
+        #         wr_err = ''
+        #     else:
+        #         value_Item = QTableWidgetItem(str(value))
+        #
+        #         if str(par['editable']) != 'nan':
+        #             value_Item.setFlags(value_Item.flags() | Qt.ItemIsEditable)
+        #             value_Item.setBackground(QColor('#D7FBFF'))
+        #         else:
+        #             value_Item.setFlags(value_Item.flags() & ~Qt.ItemIsEditable)
+        #
+        #         if str(par['strings']) != 'nan':
+        #             value_Item.setStatusTip(str(par['strings']))
+        #             value_Item.setToolTip(str(par['strings']))
+        #
+        #         self.params_table.setItem(row, self.value_col, value_Item)
+        #
+        #     row += 1
+        # self.params_table.resizeColumnsToContents()
+        # self.params_table.itemChanged.connect(window.save_item)
 
     def save_item(self, item):
         new_value = item.text()
@@ -364,7 +381,7 @@ class ExampleApp(QtWidgets.QMainWindow, CANAnalyzer_ui.Ui_MainWindow):
             return False
 
 
-app = QtWidgets.QApplication([])
+app = QApplication([])
 window = ExampleApp()  # Создаём объект класса ExampleApp
 
 excel_data_df = pandas.read_excel('burr_30_forw_v31_27072021.xls')
@@ -399,8 +416,15 @@ window.pushButton_2.clicked.connect(update_param)
 window.list_bookmark.setCurrentRow(0)
 show_empty_params_list(bookmark_dict[window.list_bookmark.currentItem().text()], 'params_table')
 show_empty_params_list(editable_params_list, 'params_table_2')
-window.list_bookmark.itemClicked.connect(window.list_of_params)
+window.list_bookmark.itemClicked.connect(window.list_of_params_table)
 window.params_table.resizeColumnsToContents()
-
+for name, par in often_used_params.items():
+    slider = getattr(window, name)
+    slider.setMinimum(par['min'] * par['scale'])
+    slider.setMaximum(par['max'] * par['scale'])
+    slider.setPageStep(par['scale'])
+    slider.setTickInterval(1)
+    slider.setTracking(False)
+    slider.valueChanged.connect(window.move_slider)
 window.show()  # Показываем окно
 app.exec_()  # и запускаем приложение
