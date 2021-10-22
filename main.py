@@ -9,7 +9,7 @@ sys.path.insert(1, 'C:\\Users\\timofey.inozemtsev\\PycharmProjects\\dll_power')
 
 from dll_power import CANMarathon
 from PyQt5 import QtWidgets, QtGui
-from PyQt5.QtWidgets import QTableWidgetItem, QComboBox, QApplication
+from PyQt5.QtWidgets import QTableWidgetItem, QComboBox, QApplication, QMessageBox, QAbstractSlider
 
 import CANAnalyzer_ui
 import pandas as pandas
@@ -42,8 +42,32 @@ often_used_params = {
                         'address': 403,
                         'min': 20,
                         'max': 80,
-                        'unit': 'A'},
+                        'unit': 'A'}
 }
+'''
+    Вот список байта аварий, побитно начиная от самого младшего:
+    Битовое поле формируется от самого младшего к старшему биту справа на лево.
+    Например 
+    Бит 0 соответствует значению 0000 0001 или 0х01  ModFlt:1;  // 0  авария модуля 
+    Бит 1 это 0000 0010 или 0x02         SCFlt:1;  // 1  кз на выходе
+    Бит 2 это 0000 0100 или 0х04        HellaFlt:1;  // 2  авария датчика положение/калибровки
+    Бит 3 это 0000 1000 или 0х08        TempFlt:1;  // 3  перегрев силового радиатора
+    Бит 4 это 0001 0000 или 0x10        OvVoltFlt:1;  // 4  перенапряжение Udc
+    Бит 5 это 0010 0000 или 0х20        UnVoltFlt:1;   // 5  понижение напряжения Udc
+    Бит 6 это 0100 0000 или 0х40        OverCurrFlt:1;// 6  длительная токовая перегрузка
+    Бит 7 это 1000 0000 или 0х80        RevErrFlt:1;   // 7  неправильная полярность DC-мотора
+'''
+
+errors_list = {0x1: 'авария модуля',
+               0x2: 'кз на выходе',
+               0x4: 'авария датчика положение/калибровки',
+               0x8: 'перегрев силового радиатора',
+               0x10: 'перенапряжение Udc',
+               0x20: 'понижение напряжения Udc',
+               0x40: 'длительная токовая перегрузка',
+               0x80: 'неправильная полярность DC-мотора',
+               }
+
 rb_param_list = {'current_wheel': {'scale': 'nan',
                                    'value': 0,
                                    'address': 35},
@@ -52,6 +76,9 @@ rb_param_list = {'current_wheel': {'scale': 'nan',
                                 'address': 109},
                  }
 
+def check_connection():
+
+    pass
 
 def show_value(col_value: int, list_of_params: list, table: str):
     global wr_err
@@ -68,8 +95,11 @@ def show_value(col_value: int, list_of_params: list, table: str):
             value = par['value']
 
         if wr_err:
+            #  надо выкидывать предупреждение, что адаптер не обнаружен
+            QMessageBox.critical(window, "Ошибка ", "Кажется, адаптер не подключен", QMessageBox.Ok)
             print(wr_err)
             wr_err = ''
+            break
         else:
             value_Item = QTableWidgetItem(str(value))
 
@@ -206,7 +236,7 @@ def set_param(address: int, value: int):
                 return True
     else:
         wr_err = "can't write param into device"
-        return False
+    return False
 
 
 def get_param(address):
@@ -257,24 +287,83 @@ class ExampleApp(QtWidgets.QMainWindow, CANAnalyzer_ui.Ui_MainWindow):
         super().__init__()
         self.setupUi(self)  # Это нужно для инициализации нашего дизайна
 
-    def move_slider(self, item):
+    def set_current_wheel(self, item):
+        global current_wheel
+        if current_wheel == Front_Wheel:
+            current_wheel = Rear_Wheel
+            if str(get_param(42)) == 'nan':  # запрашиваю версию ПО у задней оси,
+                current_wheel = Front_Wheel
+                set_param(35, 3)  # если ответа нет, то можно переименовывать в заднюю
+                current_wheel = Rear_Wheel
+            else:
+                current_wheel = Front_Wheel
+                QMessageBox.critical(window, "Ошибка ", "Уже есть один задний блок", QMessageBox.Ok)
+                return False
+        elif current_wheel == Rear_Wheel:
+            current_wheel = Front_Wheel
+            if str(get_param(42)) == 'nan':  # запрашиваю версию ПО у передней оси,
+                current_wheel = Rear_Wheel
+                set_param(35, 2)  # если ответа нет, то можно переименовывать в переднюю
+                current_wheel = Front_Wheel
+            else:
+                current_wheel = Rear_Wheel
+                QMessageBox.critical(window, "Ошибка ", "Уже есть один передний блок", QMessageBox.Ok)
+                return False
+        pass
+
+    def set_byte_order(self, item):
+        rb_toggled = QApplication.instance().sender()
+        if rb_toggled == window.rb_big_endian:
+            set_param(109, 0)  # охренеть как тупо
+        elif rb_toggled == window.rb_little_endian:
+            set_param(109, 1)
+
+    def moved_slider(self, item):
         slider = QApplication.instance().sender()
-        # item = slider.value()
         param = slider.objectName()
         value = item / often_used_params[param]['scale']
-        print(f'New {param} is {item}')
         label = getattr(self, 'lab_' + param)
         label.setText(str(value) + often_used_params[param]['unit'])
 
-        pass
+    def set_slider(self):  # , item):
+
+        slider = QApplication.instance().sender()
+        param = slider.objectName()
+        item = slider.value()
+        value = item / often_used_params[param]['scale']
+        address = often_used_params[param]['address']
+        print(f'New {param} is {item}')
+        label = getattr(self, 'lab_' + param)
+        label.setText(str(value) + often_used_params[param]['unit'])
+        # надо сделать цикл раза три запихнуть параметр и проверить, если не получилось - предупреждение
+        if set_param(address, item):
+            check_value = get_param(address)
+            if check_value == item:
+                print('Checked changed value - OK')
+                label.setStyleSheet('background-color: green')
+                return True
+        label.setStyleSheet('background-color: red')
+        slider.valueChanged.disconnect()
+        QMessageBox.critical(self, "Ошибка ",
+                             "Не получается сохранить параметр в устройстве\n Возможно адаптер не "
+                             "подключен", QMessageBox.Ok)
+        slider.valueChanged.connect(window.set_slider)
 
     def best_params(self):
         self.lb_soft_version.setText('Версия ПО БУРР ' + str(get_param(42)))
+        errors = get_param(0)
+        errors_str = ''
+        if str(errors) != 'nan':
+            for err_nom, err_str in errors_list.items():
+                if errors & err_nom:
+                    errors_str += err_str + '\n'
+        else:
+            errors_str = 'Нет ошибок '
+        self.tb_errors.setText(errors_str)
 
-        cur_wheel = get_param(35)
-        if cur_wheel == 2:
+        if current_wheel == Front_Wheel:
             self.front_wheel.setChecked(True)
-        elif cur_wheel == 3:
+        elif current_wheel == Rear_Wheel:
             self.rear_wheel.setChecked(True)
 
         byte_order = get_param(109)
@@ -423,8 +512,15 @@ for name, par in often_used_params.items():
     slider.setMinimum(par['min'] * par['scale'])
     slider.setMaximum(par['max'] * par['scale'])
     slider.setPageStep(par['scale'])
-    slider.setTickInterval(1)
+    # slider.setTickInterval(1)
     slider.setTracking(False)
-    slider.valueChanged.connect(window.move_slider)
+    # slider.setRepeatAction(QAbstractSlider.SliderSingleStepSub)
+    slider.sliderMoved.connect(window.moved_slider)
+    slider.valueChanged.connect(window.set_slider)  # valueChanged
+    # print(slider.repeatAction())
+
+window.rb_big_endian.toggled.connect(window.set_byte_order)
+window.rb_little_endian.toggled.connect(window.set_byte_order)
+
 window.show()  # Показываем окно
 app.exec_()  # и запускаем приложение
